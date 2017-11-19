@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Document</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+    }
+
+    .box {
+      margin: 50px auto;
+      /* border: 1px solid #000; */
+      width: 500px;
+      height: 300px;
+    }
+
+    label {
+      margin-left: 5px;
+    }
+
+    select {
+      appearance: none;
+      -moz-appearance: none;
+      -webkit-appearance: none;
+      outline-style: none;
+      padding: 3px 15px;
+      margin-left: 5px;
+      text-align: center;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="box">
+    <label for="province">省</label>
+    <select name="province" id="province"></select>
+    <label for="city">市</label>
+    <select name="city" id="city">
+<option value="">nihaoa </option>
+    </select>
+    <label for="">区</label>
+    <select name="area" id="area">
+      <option value="">nihaoa </option>
+    </select>
+  </div>
+
+  <script src="./node_modules/jquery/dist/jquery.min.js"></script>
+  <script>
+    $(function () {
+      let provinceEle = $("#province");
+      let cityEle = $("#city");
+      let areaEle = $("#area");
+      // 初始化时，code默认为000000
+      let code = "000000";
+
+      // 初始化时，判断缓存中是否有数据
+      let localData = window.localStorage.getItem(code);
+      if (localData) {
+        // 从内存中取数据
+        let provinces = JSON.parse(localData);
+        getHtml(provinceEle, provinces);
+        code = "110000";
+        let citys = window.localStorage.getItem(code);
+        getHtml(cityEle, JSON.parse(citys));
+        code = "110100";
+        let areas = window.localStorage.getItem(code);
+        getHtml(areaEle, JSON.parse(areas));
+      } else {
+        // 请求数据
+        ajax("http://localhost:9000/provinces", "get")
+          .then(function (data) {
+            let provinces = data.result;
+            // 存到本地
+            window.localStorage.setItem("000000", JSON.stringify(provinces));
+            getHtml(provinceEle, provinces);
+            let param = { itemcode: provinces[0].item_code };
+            return ajax("http://localhost:9000/city", "get", param);
+          })
+          .then(function (data) {
+            let citys = data.result;
+            code = provinceEle.val();
+            // 存到本地
+            window.localStorage.setItem(code, JSON.stringify(citys));
+            getHtml(cityEle, citys);
+            let param = { itemcode: citys[0].item_code };
+            return ajax("http://localhost:9000/area", "get", param);
+          })
+          .then(function (data) {
+            let areas = data.result;
+            code = cityEle.val();
+            // 存到本地
+            window.localStorage.setItem(code, JSON.stringify(areas));
+            getHtml(areaEle, areas);
+          })
+      }
+
+      // 页面数据的初始化
+      // ajax("http://localhost:9000/provinces", "get")
+      //   .then(function (data) {
+      //     let provinces = data.result;
+      //     getHtml(provinceEle, provinces);
+      //     let param = { itemcode: provinces[0].item_code };
+      //     return ajax("http://localhost:9000/city", "get", param);
+      //   })
+      //   .then(function (data) {
+      //     let citys = data.result;
+      //     getHtml(cityEle, citys);
+      //     let param = { itemcode: citys[0].item_code };
+      //     return ajax("http://localhost:9000/area", "get", param);
+      //   })
+      //   .then(function (data) {
+      //     let areas = data.result;
+      //     getHtml(areaEle, areas);
+      //   })
+
+      // 监听provinceEle的change事件，变化时加载市的数据
+      provinceEle.change(function () {
+        code = this.value;
+        // 判断缓存中是否存在
+        let localData = window.localStorage.getItem(code);
+        if (localData) {
+          let citys = JSON.parse(localData);
+          getHtml(cityEle, citys);
+          code = citys[0].item_code;
+          let areas = window.localStorage.getItem(code);
+          getHtml(areaEle, JSON.parse(areas));
+        } else {
+          let param = { itemcode: code };
+          ajax("http://localhost:9000/city", "get", param)
+            .then(function (data) {
+              let citys = data.result;
+              window.localStorage.setItem(code, JSON.stringify(citys));
+              // 同步code
+              code = citys[0].item_code;
+              getHtml(cityEle, citys);
+              let param = { itemcode: citys[0].item_code };
+              return ajax("http://localhost:9000/area", "get", param);
+            })
+            .then(function (data) {
+              let areas = data.result;
+              window.localStorage.setItem(code, JSON.stringify(areas));
+              getHtml(areaEle, areas);
+            })
+        }
+      });
+
+      // 监听cityEle的change事件，变化时加载市的数据
+      cityEle.change(function () {
+        code = this.value;
+        // 判断缓存中是否存在
+        let localData = window.localStorage.getItem(code);
+        if (localData) {
+          let areas = localData;
+          getHtml(areaEle, JSON.parse(areas));
+        } else {
+          let param = { itemcode: code };
+          ajax("http://localhost:9000/area", "get", param)
+            .then(function (data) {
+              let areas = data.result;
+              window.localStorage.setItem(code, JSON.stringify(areas));
+              getHtml(areaEle, areas);
+            })
+        }
+      })
+
+      // 用promise解决毁掉地狱
+      function ajax(url, type, param, callback) {
+        let p = new Promise(function (resolve, reject) {
+          if (!param) {
+            $.ajax({
+              type: type,
+              url: url,
+              dataType: "json",
+              success: function (data) {
+                resolve(data);
+              }
+            });
+          } else {
+            $.ajax({
+              type: type,
+              url: url,
+              dataType: "json",
+              data: param,
+              success: function (data) {
+                resolve(data);
+              }
+            });
+          }
+
+        });
+        return p;
+      }
+
+      // 拼接option
+      function getHtml(ele, data) {
+        let htmlStr = "";
+        // <option value="nihao ">nihao </option>
+        for (let i = 0; i < data.length; i++) {
+          htmlStr += '<option value="' + data[i].item_code + '">' + data[i].item_name + '</option>';
+        }
+        ele.html(htmlStr);
+      }
+      // 从缓存中取数据
+      // function getDataFromCache(code){
+      //   let 
+      //   if(window.localStorage.getItem(code)){
+
+      //   }
+      // }
+    })
+  </script>
+</body>
+
+</html>
